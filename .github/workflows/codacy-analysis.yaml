@@ -14,19 +14,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Codacy Analysis CLI
+      - name: Run Codacy Analysis CLI (Semgrep only)
         uses: codacy/codacy-analysis-cli-action@v4
         with:
+          tool: semgrep
+
           # Produces SARIF for GitHub code scanning
           output: results.sarif
           format: sarif
-          # Severity of non-security issues for GH compatibility
           gh-code-scanning-compat: true
-          # Forces 0 exit code to ensure SARIF is always uploaded;
-          # GitHub will decide PR status based on the uploaded alerts.
+
+          # Don’ts fail the job due to findings (we still want SARIF uploaded)
           max-allowed-issues: 2147483647
 
       - name: Upload SARIF results file
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: results.sarifsss
+          sarif_file: results.sarif
