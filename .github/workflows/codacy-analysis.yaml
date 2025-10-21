@@ -6,28 +6,45 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   codacy-security-scan:
     name: Codacy Security Scan
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Run ONLY Semgrep via Codacy CLI to avoid Trivy/pattern issues
       - name: Run Codacy Analysis CLI (Semgrep only)
         uses: codacy/codacy-analysis-cli-action@v4
         with:
+          # Limit to a broadly applicable tool
           tool: semgrep
 
-          # Produces SARIF for GitHub code scanning
+          # Produce SARIF for GitHub code scanning
           output: results.sarif
           format: sarif
           gh-code-scanning-compat: true
 
-          # Don’ts fail the job due to findings (we still want SARIF uploaded)
+          # Do not fail the job due to findings; we want the upload to happen
           max-allowed-issues: 2147483647
+
+      # GitHub code scanning now rejects SARIF with multiple runs of the same category.
+      # Keep only the first run before uploading.
+      - name: Keep only the first SARIF run
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          jq '{ "$schema": ."$schema", version: .version, runs: [ .runs[0] ] }' results.sarif > results_one.sarif
+          echo "Original runs: $(jq '.runs | length' results.sarif)"
+          echo "New runs: $(jq '.runs | length' results_one.sarif)"
 
       - name: Upload SARIF results file
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: results.sarif
+          sarif_file: results_one.sarif
+          category: codacy-semgrep
